@@ -1,0 +1,356 @@
+import React, { useState } from 'react';
+import { 
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend 
+} from 'recharts';
+import { 
+  LayoutDashboard, TrendingUp, Users, MessageCircle, DollarSign, 
+  ShoppingBag, Target, ArrowUpRight, ArrowDownRight, Calendar, AlertCircle 
+} from 'lucide-react';
+
+// --- DATA CONSTANTS (Procesados de tus CSVs) ---
+
+const DATA = {
+  december: {
+    label: "Diciembre 2025",
+    sales: 18653900, // Confirmado + En Prep + Entregado
+    orders: 217,
+    ticketAvg: 85962,
+    adSpend: 1385119,
+    roas: 13.47,
+    messages: 3201,
+    reach: 711647,
+    costPerMsg: 432.71,
+    potentialLost: 25206960, // "Pedido Realizado" (No contados)
+    campaigns: [
+      { name: "Casa Central - Bot", msgs: 739, cost: 140.30 },
+      { name: "Carne-BOT", msgs: 128, cost: 147.14 },
+      { name: "Influencer código", msgs: 251, cost: 165.37 },
+      { name: "Catálogo Central", msgs: 10, cost: 20710 },
+    ],
+    orderDistribution: [
+      { name: "Ventas Cerradas", value: 217, color: "#a445ff" },
+      { name: "Pedido Realizado (No cobrado)", value: 295, color: "#fbbf24" }, // Warning zone
+      { name: "Pendientes", value: 998, color: "#9ca3af" },
+    ]
+  },
+  january: {
+    label: "Enero 2026 (Parcial)",
+    sales: 266500, // Listo para entregar + En Camino (Confirmado es 0 en el archivo)
+    orders: 3,
+    ticketAvg: 88833,
+    adSpend: 469076,
+    roas: 0.57, // Bajo porque hay pocas ventas "cerradas" vs gasto continuo
+    messages: 1142,
+    reach: 228385,
+    costPerMsg: 410.75,
+    potentialLost: 1796550, // "Pedido Realizado"
+    campaigns: [
+      { name: "General (Ene)", msgs: 1142, cost: 410.75 },
+      { name: "Catálogo Francisco", msgs: 10, cost: 11433 },
+    ],
+    orderDistribution: [
+      { name: "Ventas Cerradas", value: 3, color: "#a445ff" },
+      { name: "Pedido Realizado (No cobrado)", value: 29, color: "#fbbf24" },
+      { name: "Pendientes", value: 161, color: "#9ca3af" },
+    ]
+  }
+};
+
+const COMPARISON_DATA = [
+  { name: 'Diciembre', ventas: 18653900, inversion: 1385119 },
+  { name: 'Enero (Parcial)', ventas: 266500, inversion: 469076 },
+];
+
+// --- COMPONENTS ---
+
+const Card = ({ children, className = "" }) => (
+  <div className={`bg-white rounded-xl border border-gray-100 shadow-sm p-6 ${className}`}>
+    {children}
+  </div>
+);
+
+const KPICard = ({ title, value, subtext, icon: Icon, trend, trendValue }) => (
+  <Card className="relative overflow-hidden group hover:shadow-md transition-all duration-300">
+    <div className="flex justify-between items-start">
+      <div>
+        <p className="text-sm font-medium text-gray-500 mb-1 font-poppins">{title}</p>
+        <h3 className="text-3xl font-bold text-[#1c003d] font-mono tracking-tight">{value}</h3>
+      </div>
+      <div className="p-3 bg-[#a445ff]/10 rounded-lg text-[#a445ff]">
+        <Icon size={24} />
+      </div>
+    </div>
+    <div className="mt-4 flex items-center text-sm">
+      {trend === 'up' ? (
+        <span className="text-emerald-600 flex items-center font-medium">
+          <ArrowUpRight size={16} className="mr-1" /> {trendValue}
+        </span>
+      ) : (
+        <span className="text-rose-500 flex items-center font-medium">
+          <ArrowDownRight size={16} className="mr-1" /> {trendValue}
+        </span>
+      )}
+      <span className="text-gray-400 ml-2">{subtext}</span>
+    </div>
+  </Card>
+);
+
+const XetroPillar = ({ label, value, sublabel, icon: Icon, active }) => (
+  <div className={`flex flex-col items-center p-4 rounded-xl border transition-all duration-300 ${active ? 'bg-[#1c003d] border-[#1c003d] text-white' : 'bg-white border-gray-100 text-gray-600 hover:border-[#a445ff]'}`}>
+    <Icon size={24} className={`mb-3 ${active ? 'text-[#a445ff]' : 'text-gray-400'}`} />
+    <span className="text-xs font-semibold uppercase tracking-wider mb-1 opacity-80">{label}</span>
+    <span className="text-xl font-bold font-mono">{value}</span>
+    <span className="text-[10px] mt-1 opacity-70">{sublabel}</span>
+  </div>
+);
+
+// --- MAIN DASHBOARD ---
+
+export default function DashboardXETRO() {
+  const [period, setPeriod] = useState('december');
+  const currentData = DATA[period];
+  const isDec = period === 'december';
+
+  const formatCurrency = (val) => 
+    new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(val);
+
+  const formatNumber = (val) => 
+    new Intl.NumberFormat('es-AR').format(val);
+
+  return (
+    <div className="flex min-h-screen bg-gray-50 font-inter text-gray-800">
+      
+      {/* SIDEBAR */}
+      <aside className="w-64 bg-[#1c003d] text-white fixed h-full z-20 hidden md:flex flex-col">
+        <div className="p-8">
+          <h1 className="text-2xl font-bold font-poppins tracking-tighter">XETRO<span className="text-[#a445ff]">.</span></h1>
+          <p className="text-xs text-gray-400 mt-1">Analytics Los Paisanito</p>
+        </div>
+        
+        <nav className="flex-1 px-4 space-y-2">
+          <button className="flex items-center w-full px-4 py-3 bg-[#a445ff] text-white rounded-lg shadow-lg shadow-[#a445ff]/20 transition-all">
+            <LayoutDashboard size={18} className="mr-3" />
+            <span className="font-medium">Dashboard General</span>
+          </button>
+          <button className="flex items-center w-full px-4 py-3 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-all">
+            <Target size={18} className="mr-3" />
+            <span className="font-medium">Campañas Meta</span>
+          </button>
+        </nav>
+
+        <div className="p-4 border-t border-white/10">
+          <div className="bg-white/5 rounded-lg p-4">
+            <p className="text-xs text-gray-400 mb-2">Seleccionar Período</p>
+            <div className="space-y-2">
+              <button 
+                onClick={() => setPeriod('december')}
+                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${isDec ? 'bg-[#a445ff]/20 text-[#a445ff] border border-[#a445ff]' : 'text-gray-400 hover:text-white'}`}
+              >
+                Diciembre 2025
+              </button>
+              <button 
+                onClick={() => setPeriod('january')}
+                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${!isDec ? 'bg-[#a445ff]/20 text-[#a445ff] border border-[#a445ff]' : 'text-gray-400 hover:text-white'}`}
+              >
+                Enero 2026
+              </button>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT */}
+      <main className="flex-1 md:ml-64 p-8">
+        
+        {/* HEADER */}
+        <header className="flex justify-between items-end mb-10">
+          <div>
+            <h2 className="text-4xl font-bold text-[#1c003d] font-poppins mb-2">
+              Resumen {currentData.label}
+            </h2>
+            <p className="text-gray-500">Visualización basada en el Método XETRO</p>
+          </div>
+          <div className="text-right">
+             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-[#a445ff]/10 text-[#a445ff]">
+               <Calendar size={12} className="mr-2" /> Datos Consolidados
+             </span>
+          </div>
+        </header>
+
+        {/* KPI CARDS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <KPICard 
+            title="Ventas Confirmadas" 
+            value={formatCurrency(currentData.sales)} 
+            subtext="En caja"
+            icon={DollarSign}
+            trend={isDec ? "up" : "down"}
+            trendValue={isDec ? "Alto Volumen" : "Inicio de Mes"}
+          />
+          <KPICard 
+            title="ROAS (Retorno)" 
+            value={`${currentData.roas}x`} 
+            subtext="Eficiencia Publicitaria"
+            icon={TrendingUp}
+            trend={currentData.roas > 5 ? "up" : "down"}
+            trendValue={currentData.roas > 5 ? "Excelente" : "Requiere Optimización"}
+          />
+          <KPICard 
+            title="Ticket Promedio" 
+            value={formatCurrency(currentData.ticketAvg)} 
+            subtext="Por pedido válido"
+            icon={ShoppingBag}
+            trend="up"
+            trendValue="Estable"
+          />
+        </div>
+
+        {/* XETRO PILLARS */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-10">
+          <XetroPillar label="Experiencia" value={currentData.orders} sublabel="Pedidos Válidos" icon={ShoppingBag} />
+          <XetroPillar label="Emoción" value={formatNumber(currentData.messages)} sublabel="Conversaciones" icon={MessageCircle} />
+          <XetroPillar label="Tráfico" value={isDec ? "711K" : "228K"} sublabel="Alcance Meta" icon={Users} />
+          <XetroPillar label="Retención" value={formatCurrency(currentData.sales).slice(0, -3) + "M"} sublabel="Facturación" icon={DollarSign} active={true} />
+          <XetroPillar label="Optimización" value={`${currentData.roas}x`} sublabel="ROAS Global" icon={Target} />
+        </div>
+
+        {/* CHARTS ROW */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
+          
+          {/* Main Chart: Sales vs Spend */}
+          <Card className="lg:col-span-2">
+            <h3 className="text-lg font-bold text-[#1c003d] mb-6 font-poppins">Comparativa: Ventas vs. Inversión</h3>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={COMPARISON_DATA} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#6b7280'}} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280'}} tickFormatter={(val) => `$${val/1000}k`} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1c003d', border: 'none', borderRadius: '8px', color: '#fff' }}
+                    itemStyle={{ color: '#fff' }}
+                    formatter={(value) => formatCurrency(value)}
+                  />
+                  <Legend />
+                  <Bar dataKey="ventas" name="Ventas Confirmadas" fill="#a445ff" radius={[4, 4, 0, 0]} barSize={50} />
+                  <Bar dataKey="inversion" name="Inversión Ads" fill="#1c003d" radius={[4, 4, 0, 0]} barSize={50} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          {/* Secondary Chart: Orders Status */}
+          <Card>
+            <h3 className="text-lg font-bold text-[#1c003d] mb-2 font-poppins">Embudo de Ventas</h3>
+            <p className="text-xs text-gray-500 mb-6">Pedidos Válidos vs. "Pedido Realizado"</p>
+            <div className="h-[250px] w-full relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={currentData.orderDistribution}
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {currentData.orderDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(val) => val + " pedidos"} />
+                </PieChart>
+              </ResponsiveContainer>
+              {/* Center Text */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-3xl font-bold text-[#1c003d]">{currentData.orders}</span>
+                <span className="text-xs text-gray-500">Cerrados</span>
+              </div>
+            </div>
+            <div className="space-y-3 mt-4">
+                {currentData.orderDistribution.map((item, i) => (
+                    <div key={i} className="flex justify-between text-sm">
+                        <span className="flex items-center text-gray-600">
+                            <div className="w-2 h-2 rounded-full mr-2" style={{backgroundColor: item.color}}></div>
+                            {item.name}
+                        </span>
+                        <span className="font-mono font-bold">{item.value}</span>
+                    </div>
+                ))}
+            </div>
+          </Card>
+        </div>
+
+        {/* DETAILED TABLES */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          
+          {/* Campaigns Table */}
+          <Card>
+            <h3 className="text-lg font-bold text-[#1c003d] mb-4 font-poppins">Eficiencia de Campañas</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-gray-500 uppercase bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3">Campaña</th>
+                    <th className="px-4 py-3 text-right">Mensajes</th>
+                    <th className="px-4 py-3 text-right">Costo/Msj</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {currentData.campaigns.map((camp, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3 font-medium text-[#1c003d]">{camp.name}</td>
+                      <td className="px-4 py-3 text-right font-mono text-gray-600">{camp.msgs}</td>
+                      <td className="px-4 py-3 text-right font-mono font-bold text-[#a445ff]">
+                        {formatCurrency(camp.cost)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          {/* Recommendations / Analysis */}
+          <Card className="bg-[#1c003d] text-white border-none">
+            <h3 className="text-lg font-bold mb-4 font-poppins flex items-center">
+              <AlertCircle size={20} className="mr-2 text-[#a445ff]" />
+              Análisis XETRO & Oportunidades
+            </h3>
+            <div className="space-y-6">
+              <div className="flex gap-4">
+                <div className="w-1 bg-[#a445ff] rounded-full"></div>
+                <div>
+                  <h4 className="font-bold text-sm mb-1">Cuello de Botella: "Pedido Realizado"</h4>
+                  <p className="text-sm text-gray-300 leading-relaxed">
+                    Hay <span className="text-[#a445ff] font-bold">{formatCurrency(currentData.potentialLost)}</span> estancados en el estado "Pedido Realizado". Estos clientes ya decidieron comprar pero falta confirmación final/pago. Prioridad máxima contactarlos.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <div className="w-1 bg-white/20 rounded-full"></div>
+                <div>
+                  <h4 className="font-bold text-sm mb-1">Eficiencia del Bot (Diciembre)</h4>
+                  <p className="text-sm text-gray-300 leading-relaxed">
+                    La campaña "Casa Central - Bot" tuvo el mejor costo por resultado ($140/msg). Se recomienda replicar su estructura en Enero.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                 <div className="w-1 bg-white/20 rounded-full"></div>
+                 <div>
+                    <h4 className="font-bold text-sm mb-1">Situación Enero</h4>
+                    <p className="text-sm text-gray-300 leading-relaxed">
+                        El ROAS es negativo (0.57x) porque las ventas no se están marcando como "Entregado" o "Confirmado" en el sistema, aunque la publicidad sigue gastando.
+                    </p>
+                 </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+      </main>
+    </div>
+  );
+}
