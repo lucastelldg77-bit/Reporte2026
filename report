@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Dashboard XETRO</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Plotly -->
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <!-- SheetJS XLSX (OFICIAL y FUNCIONANDO) -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700&family=Inter:wght@400;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+
+  <style>
+    body { margin:0; font-family:Inter,system-ui; background:#f6f7fb; color:#14121a }
+    .app { display:flex; min-height:100vh }
+    aside { width:280px; background:#1c003d; color:#fff; padding:16px }
+    main { flex:1; padding:24px }
+    h1,h2,h3 { font-family:Poppins }
+    label { font-size:12px; opacity:.85 }
+    input,select,button {
+      width:100%; padding:10px; border-radius:10px; border:none; margin-top:6px
+    }
+    button { background:#a445ff; color:#fff; font-weight:700; cursor:pointer }
+    button:hover { opacity:.9 }
+    .card {
+      background:#fff; border-radius:16px; padding:16px;
+      box-shadow:0 10px 30px rgba(0,0,0,.08); margin-bottom:16px
+    }
+    .grid { display:grid; gap:16px }
+    .kpis { grid-template-columns:repeat(auto-fit,minmax(220px,1fr)) }
+    .mono { font-family:"IBM Plex Mono",monospace }
+  </style>
+</head>
+
+<body>
+<div class="app">
+  <aside>
+    <h2>Dashboard XETRO</h2>
+
+    <label>Cliente</label>
+    <input id="clientName" value="Los Paisanito">
+
+    <label>Período</label>
+    <input id="periodLabel" value="Diciembre 2025">
+
+    <label>Excel Ventas</label>
+    <input type="file" id="salesFile" accept=".xlsx">
+
+    <label>Excel Meta Ads</label>
+    <input type="file" id="adsFile" accept=".xlsx">
+
+    <button onclick="build()">Crear dashboard</button>
+  </aside>
+
+  <main>
+    <h1 id="title">Sin datos</h1>
+
+    <div class="grid kpis">
+      <div class="card">
+        <h3>Facturación</h3>
+        <div class="mono" id="kpiRevenue">—</div>
+      </div>
+      <div class="card">
+        <h3>Mensajes</h3>
+        <div class="mono" id="kpiMsgs">—</div>
+      </div>
+      <div class="card">
+        <h3>Costo / Mensaje</h3>
+        <div class="mono" id="kpiCpm">—</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Estados de ventas</h3>
+      <div id="pieSales" style="height:320px"></div>
+    </div>
+
+    <div class="card">
+      <h3>Campañas Meta Ads</h3>
+      <div id="barAds" style="height:320px"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+function num(v){
+  if(typeof v==="number") return v;
+  return Number(String(v).replace(/[^\d,.-]/g,"").replace(".","").replace(",","."));
+}
+function money(v){
+  return new Intl.NumberFormat("es-AR",{style:"currency",currency:"ARS"}).format(v||0);
+}
+
+async function readExcel(file){
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf,{type:"array"});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(ws,{header:1});
+}
+
+async function build(){
+  const salesFile=document.getElementById("salesFile").files[0];
+  const adsFile=document.getElementById("adsFile").files[0];
+  if(!salesFile||!adsFile){ alert("Faltan archivos"); return }
+
+  const sales=await readExcel(salesFile);
+  const ads=await readExcel(adsFile);
+
+  const states=[], values=[];
+  sales.slice(1).forEach(r=>{
+    if(!r[0]) return;
+    states.push(r[0]);
+    values.push(num(r[1]));
+  });
+
+  Plotly.newPlot("pieSales",[{
+    type:"pie",labels:states,values:values,hole:.4
+  }],{margin:{t:0}});
+
+  const camp=[], cost=[];
+  ads.slice(1).forEach(r=>{
+    if(!r[0]) return;
+    camp.push(r[0]);
+    cost.push(num(r[8]));
+  });
+
+  Plotly.newPlot("barAds",[{
+    type:"bar",x:camp,y:cost
+  }],{margin:{t:0},yaxis:{title:"Costo / mensaje"}});
+
+  document.getElementById("kpiRevenue").textContent =
+    money(values.reduce((a,b)=>a+b,0));
+  document.getElementById("kpiMsgs").textContent =
+    cost.length;
+  document.getElementById("kpiCpm").textContent =
+    money(cost.reduce((a,b)=>a+b,0)/cost.length);
+
+  document.getElementById("title").textContent =
+    document.getElementById("clientName").value+" – "+
+    document.getElementById("periodLabel").value;
+}
+</script>
+</body>
+</html>
